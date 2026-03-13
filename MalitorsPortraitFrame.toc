@@ -1,0 +1,14 @@
+## Interface: 120001
+## Title: Malitor's Portrait Frame
+## Notes: A movable 3D Portrait.
+## Author: Malitor Greymaulkin (https://www.curseforge.com/members/malitor/projects)
+## Version: 1.0
+## SavedVariables: MalitorsPortraitFrameDB
+## OptionalDeps: LibSharedMedia-3.0
+
+MalitorsPortraitFrame.lua
+Constants.lua
+Helpers.lua
+Core.lua
+Options.lua
+Events.lua

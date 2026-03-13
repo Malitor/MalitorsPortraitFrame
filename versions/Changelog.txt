@@ -1,0 +1,8 @@
+----------------------------
+March 12, 2026 - Update #2
+* Fixed an issue that caused a taint error when changing targets.
+----------------------------
+March 12, 2026
+* Initial Replease
+* Code restructure
+	- Refactored and restructured code to be modular and use proper namespaces.
