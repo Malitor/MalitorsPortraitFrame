@@ -11,6 +11,11 @@ tblNamespace.Options = {}
 tblNamespace.Events = {}
 tblNamespace.State = {}
 
+-- AceDB object
+tblNamespace.objDatabase = nil
+tblNamespace.State.objProfilesPanel = nil
+tblNamespace.State.blnProfilesRegistered = false
+
 -- LibSharedMedia
 tblNamespace.State.objLSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 
@@ -33,3 +38,6 @@ tblNamespace.State.blnApplyModelViewQueued = false
 -- 1 = important lifecycle events
 -- 2 = verbose camera/apply spam
 tblNamespace.State.intDebugModel = 0
+
+tblNamespace.State.blnProfileCallbacksRegistered = false
+tblNamespace.State.fnRefreshOptionsControls = nil

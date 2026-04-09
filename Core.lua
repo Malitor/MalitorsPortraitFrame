@@ -32,14 +32,6 @@ function tblCore.ReapplyAfterDelay(_intToken, _fltDelay, _strLabel)
 		if not frmModel then return end
 		if frmModel._applyToken ~= _intToken then return end
 
-		local strDesiredUnit = frmModel._desiredUnit
-		if strDesiredUnit and frmModel._desiredGUID and UnitGUID(strDesiredUnit) ~= frmModel._desiredGUID then
-			if (tonumber(tblState.intDebugModel) or 0) >= 1 then
-				print("|cffff5555DBG|r Reapply IGNORE stale unit", _strLabel, "desired=", frmModel._desiredGUID, "current=", UnitGUID(strDesiredUnit))
-			end
-			return
-		end
-
 		if (tonumber(tblState.intDebugModel) or 0) >= 2 then
 			print("|cff00ff00DBG|r Reapply", _strLabel, "delay=", _fltDelay, "token=", _intToken)
 		end
@@ -77,6 +69,27 @@ function tblCore.ApplyModelViewOnceForToken(_intToken)
 	frmModel._appliedToken = _intToken
 
 	tblCore.ApplyModelView()
+end
+
+function tblCore.RefreshFromDatabase()
+	local frmMain = tblState.frmMain
+	local frmModel = tblState.frmModel
+	local tblDatabase = tblHelpers.GetDB()
+
+	if not frmMain or not frmModel or not tblDatabase then return end
+
+	-- Keep runtime debug state synced to the active profile
+	tblState.intDebugModel = tonumber(tblDatabase.debugLevel) or 0
+	if tblState.intDebugModel < 0 then tblState.intDebugModel = 0 end
+	if tblState.intDebugModel > 2 then tblState.intDebugModel = 2 end
+
+	-- Re-apply layout and visuals from the active profile
+	tblCore.ApplySavedLayout()
+	tblCore.ApplyBackdrop()
+	tblCore.ApplyLockState()
+
+	-- Re-apply model settings from the active profile
+	tblCore.RequestApplyModelView()
 end
 
 function tblCore.ForceSetModelUnit(_blnUseTarget)
@@ -200,7 +213,7 @@ function tblCore.CreateMainFrame()
 	local frmMain = CreateFrame("Frame", "MalitorsPortraitFrameMainFrame", UIParent, "BackdropTemplate")
 	tblState.frmMain = frmMain
 
-	local tblDefaults = tblConstants.tblDefaults
+	local tblDefaults = tblConstants.tblDefaults.profile
 
 	frmMain:SetPoint(tblDefaults.point, UIParent, tblDefaults.relativePoint, tblDefaults.x, tblDefaults.y)
 	frmMain:SetSize(tblDefaults.width, tblDefaults.height)
@@ -233,6 +246,11 @@ function tblCore.CreateModel()
 	frmModel._needsHardReset = false
 	frmModel._lastUnit = nil
 	frmModel._pendingApply = true
+	frmModel._blnUseTarget = false
+	frmModel._desiredGUID = nil
+	frmModel._modelLoadedToken = nil
+	frmModel._appliedToken = nil
+	frmModel._applyToken = nil
 
 	if frmModel.SetCamera then
 		frmModel:SetCamera(1)
@@ -241,19 +259,12 @@ function tblCore.CreateModel()
 
 	frmModel:SetScript("OnModelLoaded", function()
 		local frmCurrentModel = tblState.frmModel
-
 		if not frmCurrentModel then return end
 		if not frmCurrentModel._applyToken then return end
 
 		frmCurrentModel._modelLoadedToken = frmCurrentModel._applyToken
 
 		tblHelpers.DebugSnapshot("OnModelLoaded (pre-apply)", frmCurrentModel._applyToken)
-
-		local strDesiredUnit = frmCurrentModel._desiredUnit
-		if strDesiredUnit and frmCurrentModel._desiredGUID and UnitGUID(strDesiredUnit) ~= frmCurrentModel._desiredGUID then
-			print("|cffff5555DBG|r OnModelLoaded IGNORE stale load", "desired=", frmCurrentModel._desiredGUID, "current=", UnitGUID(strDesiredUnit))
-			return
-		end
 
 		if frmCurrentModel._needsHardReset then
 			tblHelpers.DebugCall("Apply", "SetPosition", 0, 0, 0)
@@ -272,7 +283,7 @@ function tblCore.CreateModel()
 		if not _intToken then return end
 
 		if frmCurrentModel._modelLoadedToken == _intToken then
-			if tblState.intDebugModel then
+			if (tonumber(tblState.intDebugModel) or 0) >= 1 then
 				print("|cffffaa00DBG|r KickApplyPipeline skip (OnModelLoaded already fired) token=", _intToken)
 			end
 			return
@@ -345,10 +356,17 @@ end
 
 function tblCore.ApplySavedLayout()
 	local frmMain = tblState.frmMain
-	local tblDatabase = tblHelpers.GetDB()
-	local tblDefaults = tblConstants.tblDefaults
+	local tblDatabase = tblHelpers.GetDB() or {}
+	local tblDefaults = tblConstants.tblDefaults.profile
+
+	local strPoint = tblDatabase.point or tblDefaults.point
+	local strRelativePoint = tblDatabase.relativePoint or tblDefaults.relativePoint
+	local intX = tblDatabase.x or tblDefaults.x
+	local intY = tblDatabase.y or tblDefaults.y
+	local intWidth = tblDatabase.width or tblDefaults.width
+	local intHeight = tblDatabase.height or tblDefaults.height
 
 	frmMain:ClearAllPoints()
-	frmMain:SetPoint(tblDatabase.point, UIParent, tblDatabase.relativePoint, tblDatabase.x, tblDatabase.y)
-	frmMain:SetSize(tblDatabase.width or tblDefaults.width, tblDatabase.height or tblDefaults.height)
+	frmMain:SetPoint(strPoint, UIParent, strRelativePoint, intX, intY)
+	frmMain:SetSize(intWidth, intHeight)
 end

@@ -11,10 +11,8 @@ local tblState = tblNamespace.State
 --========================================================
 function tblEvents.OnAddonLoaded()
 	tblHelpers.EnsureDB()
-	tblCore.ApplySavedLayout()
-	tblCore.ApplyBackdrop()
 	tblOptions.CreateOptionsPanel()
-	tblCore.ApplyLockState()
+	tblOptions.ApplyProfileToUI()
 end
 
 function tblEvents.OnTargetChanged()

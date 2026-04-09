@@ -6,6 +6,10 @@ local tblCore = tblNamespace.Core
 local tblOptions = tblNamespace.Options
 local tblState = tblNamespace.State
 
+local objAceDBOptions = LibStub("AceDBOptions-3.0")
+local objAceConfig = LibStub("AceConfig-3.0")
+local objAceConfigDialog = LibStub("AceConfigDialog-3.0")
+
 --========================================================
 -- Options Panel (Blizzard Settings)
 --========================================================
@@ -140,7 +144,8 @@ function tblOptions.AttachNumericBoxToSlider(_frmSlider, _tblOptions)
 end
 
 function tblOptions.OpenBorderColorPicker(_fnApplyColor)
-	local tblColor = tblHelpers.GetDB().borderColor or tblConstants.tblDefaults.borderColor
+	local tblDatabase = tblHelpers.GetDB()
+	local tblColor = (tblDatabase and tblDatabase.borderColor) or tblConstants.tblDefaults.profile.borderColor
 	local fltRed, fltGreen, fltBlue, fltAlpha = tblColor.r or 1, tblColor.g or 1, tblColor.b or 1, tblColor.a or 1
 
 	local function GetOpacitySlider()
@@ -207,7 +212,61 @@ function tblOptions.OpenBorderColorPicker(_fnApplyColor)
 	ColorPickerFrame:SetupColorPickerAndShow(tblInfo)
 end
 
+function tblOptions.RegisterProfileOptions(_valParentCategory)
+	if tblState.blnProfilesRegistered then return end
+	if not tblNamespace.objDatabase then return end
+
+	local tblProfileOptions = objAceDBOptions:GetOptionsTable(tblNamespace.objDatabase)
+	local valParentCategory = _valParentCategory or tblState.intSettingsCategoryID or tblState.objSettingsCategory
+
+	objAceConfig:RegisterOptionsTable("MalitorsPortraitFrame_Profiles", tblProfileOptions)
+
+	tblState.objProfilesPanel = objAceConfigDialog:AddToBlizOptions(
+		"MalitorsPortraitFrame_Profiles",
+		"Profiles",
+		valParentCategory
+	)
+
+	tblState.blnProfilesRegistered = true
+end
+
+function tblOptions.RefreshOptionsControls()
+	if tblState.fnRefreshOptionsControls then
+		tblState.fnRefreshOptionsControls()
+	end
+end
+
+function tblOptions.ApplyActiveProfileToUI()
+	tblHelpers.SyncDebugLevelFromProfile()
+	tblCore.ApplySavedLayout()
+	tblCore.ApplyBackdrop()
+	tblCore.ApplyLockState()
+	tblCore.RequestApplyModelView()
+	tblOptions.RefreshAllOptionsControls()
+end
+
+function tblOptions.RegisterProfileCallbacks()
+	if tblState.blnProfileCallbacksRegistered then return end
+	if not tblNamespace.objDatabase then return end
+
+	tblNamespace.objDatabase:RegisterCallback("OnProfileChanged", function(...)
+		tblOptions.OnProfileChanged(...)
+	end)
+	tblNamespace.objDatabase:RegisterCallback("OnProfileCopied", function(...)
+		tblOptions.OnProfileCopied(...)
+	end)
+	tblNamespace.objDatabase:RegisterCallback("OnProfileReset", function(...)
+		tblOptions.OnProfileReset(...)
+	end)
+
+	tblState.blnProfileCallbacksRegistered = true
+end
+
 function tblOptions.RegisterSettingsPanel(_frmPanel)
+	if tblState.objSettingsCategory then
+		return tblState.objSettingsCategory
+	end
+
 	if Settings and Settings.RegisterCanvasLayoutCategory then
 		tblState.objSettingsCategory = Settings.RegisterCanvasLayoutCategory(_frmPanel, _frmPanel.name)
 		Settings.RegisterAddOnCategory(tblState.objSettingsCategory)
@@ -224,6 +283,63 @@ function tblOptions.RegisterSettingsPanel(_frmPanel)
 	elseif InterfaceOptions_AddCategory then
 		InterfaceOptions_AddCategory(_frmPanel)
 	end
+
+	return tblState.objSettingsCategory
+end
+
+function tblOptions.RefreshAllOptionsControls()
+	if not tblState.tblOptionsControls then return end
+
+	local tblControls = tblState.tblOptionsControls
+
+	if tblControls.chkLock then
+		tblControls.chkLock:SetChecked(tblHelpers.GetDB() and tblHelpers.GetDB().locked)
+	end
+
+	if tblControls.RefreshBorderDropdown then
+		tblControls.RefreshBorderDropdown()
+	end
+
+	if tblControls.frmBorderWidthSlider then
+		tblControls.frmBorderWidthSlider:SetValue(tblHelpers.GetBorderWidth())
+		if tblControls.frmBorderWidthSlider._numericBoxRefresh then
+			tblControls.frmBorderWidthSlider._numericBoxRefresh()
+		end
+	end
+
+	if tblControls.UpdateBorderColorSwatch then
+		tblControls.UpdateBorderColorSwatch()
+	end
+
+	if tblControls.frmModelZoomSlider then
+		tblControls.frmModelZoomSlider:SetValue(tblHelpers.GetModelZoom())
+		if tblControls.frmModelZoomSlider._numericBoxRefresh then
+			tblControls.frmModelZoomSlider._numericBoxRefresh()
+		end
+	end
+
+	if tblControls.frmCamDistanceSlider then
+		tblControls.frmCamDistanceSlider:SetValue(tblHelpers.GetCamDistance())
+		if tblControls.frmCamDistanceSlider._numericBoxRefresh then
+			tblControls.frmCamDistanceSlider._numericBoxRefresh()
+		end
+	end
+end
+
+function tblOptions.ApplyProfileToUI()
+	tblOptions.ApplyActiveProfileToUI()
+end
+
+function tblOptions.OnProfileChanged(_strEventName, _objDatabase, _strProfileKey)
+	tblOptions.ApplyProfileToUI()
+end
+
+function tblOptions.OnProfileCopied(_strEventName, _objDatabase, _strProfileKey)
+	tblOptions.ApplyProfileToUI()
+end
+
+function tblOptions.OnProfileReset(_strEventName, _objDatabase, _strProfileKey)
+	tblOptions.ApplyProfileToUI()
 end
 
 function tblOptions.CreateOptionsPanel()
@@ -243,10 +359,10 @@ function tblOptions.CreateOptionsPanel()
 		frmGroupBox:SetBackdropColor(0, 0, 0, 0.25)
 		frmGroupBox:SetFrameLevel(_frmParent:GetFrameLevel())
 
-		local fntLabel = frmGroupBox:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-		fntLabel:SetText(_strTitleText or "")
-		fntLabel:SetPoint("TOPLEFT", frmGroupBox, "TOPLEFT", 10, 16)
-		fntLabel:SetDrawLayer("OVERLAY")
+		local fntTitle = frmGroupBox:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		fntTitle:SetText(_strTitleText or "")
+		fntTitle:SetPoint("TOPLEFT", frmGroupBox, "TOPLEFT", 10, 16)
+		fntTitle:SetDrawLayer("OVERLAY")
 
 		return frmGroupBox
 	end
@@ -255,6 +371,9 @@ function tblOptions.CreateOptionsPanel()
 	frmPanel.name = "Malitor's Portrait Frame"
 
 	tblOptions.EnsureBlizzardDropdownAPI()
+	tblOptions.RegisterSettingsPanel(frmPanel)
+	tblOptions.RegisterProfileOptions(tblState.intSettingsCategoryID or frmPanel.name)
+	tblOptions.RegisterProfileCallbacks()
 
 	local fntTitle = frmPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	fntTitle:SetPoint("TOPLEFT", 16, -16)
@@ -265,53 +384,53 @@ function tblOptions.CreateOptionsPanel()
 	fntSubtitle:SetJustifyH("LEFT")
 	fntSubtitle:SetText("Customize the portrait frame border, size, and scale.\nAdjust 3D portrait camera zoom and distance.")
 
-	local frmLockCheck = CreateFrame("CheckButton", nil, frmPanel, "UICheckButtonTemplate")
-	frmLockCheck:SetPoint("TOPLEFT", fntSubtitle, "BOTTOMLEFT", 0, -14)
-	frmLockCheck:SetScript("OnClick", function(_frmSelf)
+	local chkLock = CreateFrame("CheckButton", nil, frmPanel, "UICheckButtonTemplate")
+	chkLock:SetPoint("TOPLEFT", fntSubtitle, "BOTTOMLEFT", 0, -14)
+	chkLock:SetScript("OnClick", function(_frmSelf)
 		tblHelpers.GetDB().locked = _frmSelf:GetChecked() and true or false
 		tblCore.ApplyLockState()
 	end)
 
 	local fntLockText = frmPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	fntLockText:SetPoint("LEFT", frmLockCheck, "RIGHT", 4, 1)
+	fntLockText:SetPoint("LEFT", chkLock, "RIGHT", 4, 1)
 	fntLockText:SetText("Lock")
 
 	local frmBorderDropDown = CreateFrame("Frame", "MalitorsPortraitFrameBorderDropDown", frmPanel, "UIDropDownMenuTemplate")
-	frmBorderDropDown:SetPoint("TOPLEFT", frmLockCheck, "BOTTOMLEFT", 0, -36)
+	frmBorderDropDown:SetPoint("TOPLEFT", chkLock, "BOTTOMLEFT", 0, -36)
 	UIDropDownMenu_SetWidth(frmBorderDropDown, 260)
 
 	local function RefreshBorderDropdown()
-		local strText = (tblHelpers.GetDB() and tblHelpers.GetDB().border) or tblConstants.tblDefaults.border
-		UIDropDownMenu_SetText(frmBorderDropDown, strText or "Unknown")
+		local strBorderText = (tblHelpers.GetDB() and tblHelpers.GetDB().border) or tblConstants.tblDefaults.profile.border
+		UIDropDownMenu_SetText(frmBorderDropDown, strBorderText or "Unknown")
 	end
 
-	local function Border_OnClick(_frmSelfArg)
-		tblHelpers.GetDB().border = _frmSelfArg.value
+	local function Border_OnClick(_objSelfArg)
+		tblHelpers.GetDB().border = _objSelfArg.value
 		tblCore.ApplyBackdrop()
 		RefreshBorderDropdown()
 	end
 
 	UIDropDownMenu_Initialize(frmBorderDropDown, function()
 		if not tblState.objLSM then
-			local tblInfo = UIDropDownMenu_CreateInfo()
-			tblInfo.text = "LibSharedMedia-3.0 not found"
-			tblInfo.notCheckable = true
-			tblInfo.isTitle = true
-			UIDropDownMenu_AddButton(tblInfo)
+			local objInfo = UIDropDownMenu_CreateInfo()
+			objInfo.text = "LibSharedMedia-3.0 not found"
+			objInfo.notCheckable = true
+			objInfo.isTitle = true
+			UIDropDownMenu_AddButton(objInfo)
 			return
 		end
 
-		local strCurrent = tblHelpers.GetDB().border
-		local tblList = tblState.objLSM:List("border")
-		table.sort(tblList)
+		local strCurrentBorder = tblHelpers.GetDB().border
+		local tblBorderList = tblState.objLSM:List("border")
+		table.sort(tblBorderList)
 
-		for _, strName in ipairs(tblList) do
-			local tblInfo = UIDropDownMenu_CreateInfo()
-			tblInfo.text = strName
-			tblInfo.value = strName
-			tblInfo.func = Border_OnClick
-			tblInfo.checked = (strName == strCurrent)
-			UIDropDownMenu_AddButton(tblInfo)
+		for _, strName in ipairs(tblBorderList) do
+			local objInfo = UIDropDownMenu_CreateInfo()
+			objInfo.text = strName
+			objInfo.value = strName
+			objInfo.func = Border_OnClick
+			objInfo.checked = (strName == strCurrentBorder)
+			UIDropDownMenu_AddButton(objInfo)
 		end
 	end)
 
@@ -390,18 +509,18 @@ function tblOptions.CreateOptionsPanel()
 	frmBorderWidthSlider:SetScript("OnValueChanged", function(_frmSelf, _valValue)
 		if _frmSelf._suppressOnValueChanged then return end
 
-		_valValue = tblHelpers.SliderChangedGuard(_frmSelf, _valValue, 1, 0)
-		if _valValue == nil then return end
+		local intBorderWidthValue = tblHelpers.SliderChangedGuard(_frmSelf, _valValue, 1, 0)
+		if intBorderWidthValue == nil then return end
 
-		_valValue = tblHelpers.Clamp(tblHelpers.Round(_valValue), tblConstants.intBorderMin, tblConstants.intBorderMax)
-		tblHelpers.GetDB().borderWidth = _valValue
+		intBorderWidthValue = tblHelpers.Clamp(tblHelpers.Round(intBorderWidthValue), tblConstants.intBorderMin, tblConstants.intBorderMax)
+		tblHelpers.GetDB().borderWidth = intBorderWidthValue
 		tblCore.ApplyBackdrop()
 
 		if _frmSelf._numericBox then
 			if _frmSelf._numericBox.SetNumber then
-				_frmSelf._numericBox:SetNumber(_valValue)
+				_frmSelf._numericBox:SetNumber(intBorderWidthValue)
 			else
-				_frmSelf._numericBox:SetText(_frmSelf._numericBoxFormat(_valValue))
+				_frmSelf._numericBox:SetText(_frmSelf._numericBoxFormat(intBorderWidthValue))
 			end
 		end
 	end)
@@ -413,11 +532,9 @@ function tblOptions.CreateOptionsPanel()
 		min = tblConstants.intBorderMin,
 		max = tblConstants.intBorderMax,
 		step = 1,
-
 		get = function()
 			return tblHelpers.GetBorderWidth()
 		end,
-
 		set = function(_valValue)
 			tblHelpers.GetDB().borderWidth = tblHelpers.Clamp(tblHelpers.Round(_valValue), tblConstants.intBorderMin, tblConstants.intBorderMax)
 			tblCore.ApplyBackdrop()
@@ -445,15 +562,15 @@ function tblOptions.CreateOptionsPanel()
 	frmModelZoomSlider:SetScript("OnValueChanged", function(_frmSelf, _valValue)
 		if _frmSelf._suppressOnValueChanged then return end
 
-		_valValue = tblHelpers.SliderChangedGuard(_frmSelf, _valValue, 0.1, 2)
-		if _valValue == nil then return end
+		local fltModelZoomValue = tblHelpers.SliderChangedGuard(_frmSelf, _valValue, 0.1, 2)
+		if fltModelZoomValue == nil then return end
 
-		_valValue = tblHelpers.Clamp(tonumber(_valValue) or tblConstants.tblDefaults.modelZoom, tblConstants.fltZoomMin, tblConstants.fltZoomMax)
-		tblHelpers.GetDB().modelZoom = _valValue
+		fltModelZoomValue = tblHelpers.Clamp(tonumber(fltModelZoomValue) or tblConstants.tblDefaults.profile.modelZoom, tblConstants.fltZoomMin, tblConstants.fltZoomMax)
+		tblHelpers.GetDB().modelZoom = fltModelZoomValue
 		tblCore.RequestApplyModelView()
 
 		if _frmSelf._numericBox then
-			_frmSelf._numericBox:SetText(_frmSelf._numericBoxFormat(_valValue))
+			_frmSelf._numericBox:SetText(_frmSelf._numericBoxFormat(fltModelZoomValue))
 			_frmSelf._numericBox:HighlightText(0, 0)
 		end
 	end)
@@ -464,13 +581,11 @@ function tblOptions.CreateOptionsPanel()
 		min = tblConstants.fltZoomMin,
 		max = tblConstants.fltZoomMax,
 		step = 0.01,
-
 		get = function()
 			return tblHelpers.GetModelZoom()
 		end,
-
 		set = function(_valValue)
-			tblHelpers.GetDB().modelZoom = tblHelpers.Clamp(tonumber(_valValue) or tblConstants.tblDefaults.modelZoom, tblConstants.fltZoomMin, tblConstants.fltZoomMax)
+			tblHelpers.GetDB().modelZoom = tblHelpers.Clamp(tonumber(_valValue) or tblConstants.tblDefaults.profile.modelZoom, tblConstants.fltZoomMin, tblConstants.fltZoomMax)
 			tblCore.RequestApplyModelView()
 		end,
 	})
@@ -488,15 +603,15 @@ function tblOptions.CreateOptionsPanel()
 	frmCamDistanceSlider:SetScript("OnValueChanged", function(_frmSelf, _valValue)
 		if _frmSelf._suppressOnValueChanged then return end
 
-		_valValue = tblHelpers.SliderChangedGuard(_frmSelf, _valValue, 0.1, 2)
-		if _valValue == nil then return end
+		local fltCamDistanceValue = tblHelpers.SliderChangedGuard(_frmSelf, _valValue, 0.1, 2)
+		if fltCamDistanceValue == nil then return end
 
-		_valValue = tblHelpers.Clamp(tonumber(_valValue) or tblConstants.tblDefaults.camDistance, tblConstants.fltCamMin, tblConstants.fltCamMax)
-		tblHelpers.GetDB().camDistance = _valValue
+		fltCamDistanceValue = tblHelpers.Clamp(tonumber(fltCamDistanceValue) or tblConstants.tblDefaults.profile.camDistance, tblConstants.fltCamMin, tblConstants.fltCamMax)
+		tblHelpers.GetDB().camDistance = fltCamDistanceValue
 		tblCore.RequestApplyModelView()
 
 		if _frmSelf._numericBox then
-			_frmSelf._numericBox:SetText(_frmSelf._numericBoxFormat(_valValue))
+			_frmSelf._numericBox:SetText(_frmSelf._numericBoxFormat(fltCamDistanceValue))
 			_frmSelf._numericBox:HighlightText(0, 0)
 		end
 	end)
@@ -507,18 +622,16 @@ function tblOptions.CreateOptionsPanel()
 		min = tblConstants.fltCamMin,
 		max = tblConstants.fltCamMax,
 		step = 0.01,
-
 		get = function()
 			return tblHelpers.GetCamDistance()
 		end,
-
 		set = function(_valValue)
-			tblHelpers.GetDB().camDistance = tblHelpers.Clamp(tonumber(_valValue) or tblConstants.tblDefaults.camDistance, tblConstants.fltCamMin, tblConstants.fltCamMax)
+			tblHelpers.GetDB().camDistance = tblHelpers.Clamp(tonumber(_valValue) or tblConstants.tblDefaults.profile.camDistance, tblConstants.fltCamMin, tblConstants.fltCamMax)
 			tblCore.RequestApplyModelView()
 		end,
 	})
 
-	CreateGroupBox(
+	local frmModelGroupBox = CreateGroupBox(
 		frmPanel,
 		"Character Model",
 		frmModelZoomSlider,
@@ -527,40 +640,33 @@ function tblOptions.CreateOptionsPanel()
 	)
 
 	local function RefreshOptionsControls()
-		frmLockCheck:SetChecked(tblHelpers.GetDB() and tblHelpers.GetDB().locked)
+		chkLock:SetChecked(tblHelpers.GetDB() and tblHelpers.GetDB().locked)
 
 		RefreshBorderDropdown()
 		frmBorderWidthSlider:SetValue(tblHelpers.GetBorderWidth())
-
 		if frmBorderWidthSlider._numericBoxRefresh then frmBorderWidthSlider._numericBoxRefresh() end
+
 		UpdateBorderColorSwatch()
 
 		frmModelZoomSlider:SetValue(tblHelpers.GetModelZoom())
 		frmCamDistanceSlider:SetValue(tblHelpers.GetCamDistance())
-
 		if frmModelZoomSlider._numericBoxRefresh then frmModelZoomSlider._numericBoxRefresh() end
 		if frmCamDistanceSlider._numericBoxRefresh then frmCamDistanceSlider._numericBoxRefresh() end
 	end
 
+	tblState.fnRefreshOptionsControls = tblOptions.RefreshAllOptionsControls
+
 	local frmResetButton = CreateFrame("Button", nil, frmPanel, "UIPanelButtonTemplate")
 	frmResetButton:SetSize(120, 22)
-	frmResetButton:SetPoint("TOPLEFT", frmLockCheck, "TOPRIGHT", 86, -4)
+	frmResetButton:SetPoint("TOPLEFT", chkLock, "TOPRIGHT", 86, -4)
 	frmResetButton:SetText("Reset")
 
 	frmResetButton:SetScript("OnClick", function()
-		tblState.frmMain:ClearAllPoints()
-		tblState.frmMain:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-		tblState.frmMain:SetSize(200, 200)
+		if not tblNamespace.objDatabase then return end
 
-		MalitorsPortraitFrameDB = CopyTable(tblConstants.tblDefaults)
-		MalitorsPortraitFrameDB.borderColor = CopyTable(tblConstants.tblDefaults.borderColor)
+		tblNamespace.objDatabase:ResetProfile()
 
-		tblCore.ApplyBackdrop()
-		tblCore.ApplyLockState()
-		tblCore.RequestApplyModelView()
-		RefreshOptionsControls()
-
-		print("|cFF00FF00MalitorsPortraitFrame|r reset.")
+		print("|cFF00FF00MalitorsPortraitFrame|r current profile reset.")
 	end)
 
 	frmPanel:HookScript("OnShow", function()
@@ -572,9 +678,17 @@ function tblOptions.CreateOptionsPanel()
 			end)
 		end
 	end)
+	
+	tblState.tblOptionsControls = {
+		chkLock = chkLock,
+		frmBorderWidthSlider = frmBorderWidthSlider,
+		frmModelZoomSlider = frmModelZoomSlider,
+		frmCamDistanceSlider = frmCamDistanceSlider,
+		RefreshBorderDropdown = RefreshBorderDropdown,
+		UpdateBorderColorSwatch = UpdateBorderColorSwatch,
+	}
 
 	RefreshOptionsControls()
-	tblOptions.RegisterSettingsPanel(frmPanel)
 end
 
 --========================================================

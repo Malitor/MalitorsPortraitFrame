@@ -18,55 +18,65 @@ function tblHelpers.Round(_valValue)
 end
 
 function tblHelpers.GetDB()
-	return MalitorsPortraitFrameDB
+	if not tblNamespace.objDatabase then
+		return nil
+	end
+
+	return tblNamespace.objDatabase.profile
+end
+
+function tblHelpers.SyncDebugLevelFromProfile()
+	local tblProfile = tblHelpers.GetDB()
+	local intDebugLevel = (tblProfile and tonumber(tblProfile.debugLevel)) or tblConstants.tblDefaults.profile.debugLevel or 0
+
+	if intDebugLevel < 0 then intDebugLevel = 0 end
+	if intDebugLevel > 2 then intDebugLevel = 2 end
+
+	tblState.intDebugModel = intDebugLevel
+
+	return intDebugLevel
 end
 
 function tblHelpers.EnsureDB()
-	local tblDefaults = tblConstants.tblDefaults
-
-	if not MalitorsPortraitFrameDB then
-		MalitorsPortraitFrameDB = CopyTable(tblDefaults)
+	if not tblNamespace.objDatabase then
+		tblNamespace.objDatabase = LibStub("AceDB-3.0"):New("MalitorsPortraitFrameDB", tblConstants.tblDefaults, true)
 	end
 
-	-- Ensure new fields exist for older saved vars
-	if MalitorsPortraitFrameDB.border == nil then MalitorsPortraitFrameDB.border = tblDefaults.border end
-	if MalitorsPortraitFrameDB.background == nil then MalitorsPortraitFrameDB.background = tblDefaults.background end
-	if MalitorsPortraitFrameDB.borderWidth == nil then MalitorsPortraitFrameDB.borderWidth = tblDefaults.borderWidth end
-	if MalitorsPortraitFrameDB.borderColor == nil then MalitorsPortraitFrameDB.borderColor = CopyTable(tblDefaults.borderColor) end
-	if MalitorsPortraitFrameDB.locked == nil then MalitorsPortraitFrameDB.locked = tblDefaults.locked end
-	if MalitorsPortraitFrameDB.modelZoom == nil then MalitorsPortraitFrameDB.modelZoom = tblDefaults.modelZoom end
-	if MalitorsPortraitFrameDB.camDistance == nil then MalitorsPortraitFrameDB.camDistance = tblDefaults.camDistance end
-	if MalitorsPortraitFrameDB.debugLevel == nil then
-		MalitorsPortraitFrameDB.debugLevel = tblDefaults.debugLevel or 0
+	if not tblNamespace.objDatabase or not tblNamespace.objDatabase.profile then
+		tblState.intDebugModel = tblConstants.tblDefaults.profile.debugLevel or 0
+		return nil
 	end
 
-	tblState.intDebugModel = tonumber(MalitorsPortraitFrameDB.debugLevel) or 0
-	if tblState.intDebugModel < 0 then tblState.intDebugModel = 0 end
-	if tblState.intDebugModel > 2 then tblState.intDebugModel = 2 end
+	tblHelpers.SyncDebugLevelFromProfile()
+
+	return tblNamespace.objDatabase.profile
 end
 
 function tblHelpers.GetBorderWidth()
 	local tblDatabase = tblHelpers.GetDB()
-	local intBorderWidth = (tblDatabase and tblDatabase.borderWidth) or tblConstants.tblDefaults.borderWidth or tblConstants.intBorderMax
+	local intBorderWidth = (tblDatabase and tblDatabase.borderWidth) or tblConstants.tblDefaults.profile.borderWidth or tblConstants.intBorderMax
 	intBorderWidth = tblHelpers.Round(intBorderWidth)
 	intBorderWidth = tblHelpers.Clamp(intBorderWidth, tblConstants.intBorderMin, tblConstants.intBorderMax)
 	return intBorderWidth
 end
 
 function tblHelpers.GetBorderColor()
-	local tblColor = (tblHelpers.GetDB() and tblHelpers.GetDB().borderColor) or tblConstants.tblDefaults.borderColor
+	local tblDefaultProfile = tblConstants.tblDefaults.profile
+	local tblDatabase = tblHelpers.GetDB()
+	local tblColor = (tblDatabase and tblDatabase.borderColor) or tblDefaultProfile.borderColor
+
 	return tblColor.r or 1, tblColor.g or 1, tblColor.b or 1, tblColor.a or 1
 end
 
 function tblHelpers.GetModelZoom()
-	local fltModelZoom = (tblHelpers.GetDB() and tblHelpers.GetDB().modelZoom) or tblConstants.tblDefaults.modelZoom
-	fltModelZoom = tonumber(fltModelZoom) or tblConstants.tblDefaults.modelZoom
+	local fltModelZoom = (tblHelpers.GetDB() and tblHelpers.GetDB().modelZoom) or tblConstants.tblDefaults.profile.modelZoom
+	fltModelZoom = tonumber(fltModelZoom) or tblConstants.tblDefaults.profile.modelZoom
 	return tblHelpers.Clamp(fltModelZoom, tblConstants.fltZoomMin, tblConstants.fltZoomMax)
 end
 
 function tblHelpers.GetCamDistance()
-	local fltCamDistance = (tblHelpers.GetDB() and tblHelpers.GetDB().camDistance) or tblConstants.tblDefaults.camDistance
-	fltCamDistance = tonumber(fltCamDistance) or tblConstants.tblDefaults.camDistance
+	local fltCamDistance = (tblHelpers.GetDB() and tblHelpers.GetDB().camDistance) or tblConstants.tblDefaults.profile.camDistance
+	fltCamDistance = tonumber(fltCamDistance) or tblConstants.tblDefaults.profile.camDistance
 	return tblHelpers.Clamp(fltCamDistance, tblConstants.fltCamMin, tblConstants.fltCamMax)
 end
 
