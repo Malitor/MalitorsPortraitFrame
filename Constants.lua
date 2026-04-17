@@ -16,6 +16,8 @@ tblConstants.fltZoomMax = 1.00
 tblConstants.fltCamMin = 0.60
 tblConstants.fltCamMax = 2.50
 
+tblConstants.strLogoTexture = "Interface\\AddOns\\MalitorsPortraitFrame\\images\\icon_Logo.blp"
+
 tblConstants.tblDefaults = {
 	profile = {
 		point = "CENTER",

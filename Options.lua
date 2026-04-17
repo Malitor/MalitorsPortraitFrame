@@ -345,6 +345,35 @@ end
 function tblOptions.CreateOptionsPanel()
 	if MalitorsPortraitFrameOptionsPanel then return end
 
+	local function CreateReadOnlyURLBox(_frmParent, _strLabelText, _strURLText, _objAnchorTo)
+		local fntLabel = _frmParent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		fntLabel:SetPoint("TOPLEFT", _objAnchorTo, "BOTTOMLEFT", 0, -14)
+		fntLabel:SetText(_strLabelText)
+
+		local frmBox = CreateFrame("EditBox", nil, _frmParent, "InputBoxTemplate")
+		frmBox:SetSize(520, 24)
+		frmBox:SetPoint("TOPLEFT", fntLabel, "BOTTOMLEFT", 0, -6)
+		frmBox:SetAutoFocus(false)
+		frmBox:SetTextInsets(6, 6, 0, 0)
+		frmBox:SetText(_strURLText)
+		frmBox:SetCursorPosition(0)
+
+		frmBox:SetScript("OnEscapePressed", function(_frmSelf)
+			_frmSelf:ClearFocus()
+		end)
+
+		frmBox:SetScript("OnEditFocusGained", function(_frmSelf)
+			_frmSelf:HighlightText()
+		end)
+
+		frmBox:SetScript("OnEditFocusLost", function(_frmSelf)
+			_frmSelf:HighlightText(0, 0)
+			_frmSelf:SetCursorPosition(0)
+		end)
+
+		return frmBox
+	end
+
 	local function CreateGroupBox(_frmParent, _strTitleText, _objTopLeftAnchor, _objBottomRightAnchor, _intPadLeft, _intPadTop, _intPadRight, _intPadBottom)
 		local frmGroupBox = CreateFrame("Frame", nil, _frmParent, "BackdropTemplate")
 		frmGroupBox:SetPoint("TOPLEFT", _objTopLeftAnchor, "TOPLEFT", -(_intPadLeft or 12), (_intPadTop or 10))
@@ -375,27 +404,47 @@ function tblOptions.CreateOptionsPanel()
 	tblOptions.RegisterProfileOptions(tblState.intSettingsCategoryID or frmPanel.name)
 	tblOptions.RegisterProfileCallbacks()
 
-	local fntTitle = frmPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	local fntTitle = frmPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
 	fntTitle:SetPoint("TOPLEFT", 16, -16)
 	fntTitle:SetText("Malitor's Portrait Frame")
 
-	local fntSubtitle = frmPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	local fntSubtitle = frmPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	fntSubtitle:SetPoint("TOPLEFT", fntTitle, "BOTTOMLEFT", 0, -8)
+	fntSubtitle:SetWidth(620)
 	fntSubtitle:SetJustifyH("LEFT")
 	fntSubtitle:SetText("Customize the portrait frame border, size, and scale.\nAdjust 3D portrait camera zoom and distance.")
 
-	local chkLock = CreateFrame("CheckButton", nil, frmPanel, "UICheckButtonTemplate")
-	chkLock:SetPoint("TOPLEFT", fntSubtitle, "BOTTOMLEFT", 0, -14)
+	local txrLogo = frmPanel:CreateTexture(nil, "ARTWORK")
+	txrLogo:SetSize(40, 40)
+	txrLogo:SetTexture(tblConstants.strLogoTexture)
+	txrLogo:SetPoint("TOPRIGHT", frmPanel, "TOPRIGHT", -24, -16)
+
+	local txrHeaderDivider = frmPanel:CreateTexture(nil, "ARTWORK")
+	txrHeaderDivider:SetColorTexture(1, 1, 1, 0.10)
+	txrHeaderDivider:SetHeight(1)
+	txrHeaderDivider:SetWidth(700)
+	txrHeaderDivider:SetPoint("TOPLEFT", fntSubtitle, "BOTTOMLEFT", 0, -18)
+
+	local frmContentScroll = CreateFrame("ScrollFrame", nil, frmPanel, "UIPanelScrollFrameTemplate")
+	frmContentScroll:SetPoint("TOPLEFT", txrHeaderDivider, "BOTTOMLEFT", 0, -16)
+	frmContentScroll:SetPoint("BOTTOMRIGHT", frmPanel, "BOTTOMRIGHT", -30, 16)
+
+	local frmContent = CreateFrame("Frame", nil, frmContentScroll)
+	frmContent:SetSize(700, 580)
+	frmContentScroll:SetScrollChild(frmContent)
+
+	local chkLock = CreateFrame("CheckButton", nil, frmContent, "UICheckButtonTemplate")
+	chkLock:SetPoint("TOPLEFT", frmContent, "TOPLEFT", 0, 0)
 	chkLock:SetScript("OnClick", function(_frmSelf)
 		tblHelpers.GetDB().locked = _frmSelf:GetChecked() and true or false
 		tblCore.ApplyLockState()
 	end)
 
-	local fntLockText = frmPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local fntLockText = frmContent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	fntLockText:SetPoint("LEFT", chkLock, "RIGHT", 4, 1)
 	fntLockText:SetText("Lock")
 
-	local frmBorderDropDown = CreateFrame("Frame", "MalitorsPortraitFrameBorderDropDown", frmPanel, "UIDropDownMenuTemplate")
+	local frmBorderDropDown = CreateFrame("Frame", "MalitorsPortraitFrameBorderDropDown", frmContent, "UIDropDownMenuTemplate")
 	frmBorderDropDown:SetPoint("TOPLEFT", chkLock, "BOTTOMLEFT", 0, -36)
 	UIDropDownMenu_SetWidth(frmBorderDropDown, 260)
 
@@ -434,7 +483,7 @@ function tblOptions.CreateOptionsPanel()
 		end
 	end)
 
-	local frmBorderColorSwatch = CreateFrame("Button", nil, frmPanel)
+	local frmBorderColorSwatch = CreateFrame("Button", nil, frmContent)
 	frmBorderColorSwatch:SetSize(18, 18)
 	frmBorderColorSwatch:SetPoint("TOPLEFT", frmBorderDropDown, "TOPRIGHT", 0, -4)
 
@@ -446,7 +495,7 @@ function tblOptions.CreateOptionsPanel()
 	frmBorderColorSwatch.color:SetPoint("TOPLEFT", 1, -1)
 	frmBorderColorSwatch.color:SetPoint("BOTTOMRIGHT", -1, 1)
 
-	local fntBorderColorLabel = frmPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	local fntBorderColorLabel = frmContent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	fntBorderColorLabel:SetPoint("TOPLEFT", frmBorderColorSwatch, "TOPRIGHT", 6, -2)
 	fntBorderColorLabel:SetText("Border Color")
 
@@ -478,7 +527,7 @@ function tblOptions.CreateOptionsPanel()
 		GameTooltip:Hide()
 	end)
 
-	local frmBorderWidthSlider = CreateFrame("Slider", "MalitorsPortraitFrameBorderWidthSlider", frmPanel, "OptionsSliderTemplate")
+	local frmBorderWidthSlider = CreateFrame("Slider", "MalitorsPortraitFrameBorderWidthSlider", frmContent, "OptionsSliderTemplate")
 	frmBorderWidthSlider:SetPoint("TOPLEFT", frmBorderDropDown, "BOTTOMLEFT", 50, -26)
 	frmBorderWidthSlider:SetWidth(160)
 	frmBorderWidthSlider:SetMinMaxValues(tblConstants.intBorderMin, tblConstants.intBorderMax)
@@ -488,12 +537,12 @@ function tblOptions.CreateOptionsPanel()
 	_G[frmBorderWidthSlider:GetName() .. "High"]:SetText(tostring(tblConstants.intBorderMax))
 	_G[frmBorderWidthSlider:GetName() .. "Text"]:SetText("Border Width")
 
-	local frmBorderWidthMinus = CreateFrame("Button", nil, frmPanel, "UIPanelButtonTemplate")
+	local frmBorderWidthMinus = CreateFrame("Button", nil, frmContent, "UIPanelButtonTemplate")
 	frmBorderWidthMinus:SetSize(22, 22)
 	frmBorderWidthMinus:SetText("-")
 	frmBorderWidthMinus:SetPoint("RIGHT", frmBorderWidthSlider, "LEFT", -6, 0)
 
-	local frmBorderWidthPlus = CreateFrame("Button", nil, frmPanel, "UIPanelButtonTemplate")
+	local frmBorderWidthPlus = CreateFrame("Button", nil, frmContent, "UIPanelButtonTemplate")
 	frmBorderWidthPlus:SetSize(22, 22)
 	frmBorderWidthPlus:SetText("+")
 	frmBorderWidthPlus:SetPoint("LEFT", frmBorderWidthSlider, "RIGHT", 6, 0)
@@ -542,14 +591,14 @@ function tblOptions.CreateOptionsPanel()
 	})
 
 	local frmBorderGroupBox = CreateGroupBox(
-		frmPanel,
+		frmContent,
 		"Border",
 		frmBorderDropDown,
 		frmBorderWidthSlider,
 		0, 16, 226, 26
 	)
 
-	local frmModelZoomSlider = CreateFrame("Slider", "MalitorsPortraitFrameModelZoomSlider", frmPanel, "OptionsSliderTemplate")
+	local frmModelZoomSlider = CreateFrame("Slider", "MalitorsPortraitFrameModelZoomSlider", frmContent, "OptionsSliderTemplate")
 	frmModelZoomSlider:SetPoint("TOPLEFT", frmBorderGroupBox, "BOTTOMLEFT", 22, -56)
 	frmModelZoomSlider:SetWidth(150)
 	frmModelZoomSlider:SetMinMaxValues(tblConstants.fltZoomMin, tblConstants.fltZoomMax)
@@ -590,7 +639,7 @@ function tblOptions.CreateOptionsPanel()
 		end,
 	})
 
-	local frmCamDistanceSlider = CreateFrame("Slider", "MalitorsPortraitFrameCamDistanceSlider", frmPanel, "OptionsSliderTemplate")
+	local frmCamDistanceSlider = CreateFrame("Slider", "MalitorsPortraitFrameCamDistanceSlider", frmContent, "OptionsSliderTemplate")
 	frmCamDistanceSlider:SetPoint("TOPLEFT", frmModelZoomSlider, "TOPRIGHT", 80, 0)
 	frmCamDistanceSlider:SetWidth(150)
 	frmCamDistanceSlider:SetMinMaxValues(tblConstants.fltCamMin, tblConstants.fltCamMax)
@@ -632,12 +681,59 @@ function tblOptions.CreateOptionsPanel()
 	})
 
 	local frmModelGroupBox = CreateGroupBox(
-		frmPanel,
+		frmContent,
 		"Character Model",
 		frmModelZoomSlider,
 		frmCamDistanceSlider,
 		22, 26, 75, 26
 	)
+
+	local txrAboutDivider = frmContent:CreateTexture(nil, "ARTWORK")
+	txrAboutDivider:SetColorTexture(1, 1, 1, 0.10)
+	txrAboutDivider:SetHeight(1)
+	txrAboutDivider:SetWidth(700)
+	txrAboutDivider:SetPoint("TOPLEFT", frmModelGroupBox, "BOTTOMLEFT", 0, -22)
+
+	local fntAboutHeader = frmContent:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	fntAboutHeader:SetPoint("TOPLEFT", txrAboutDivider, "BOTTOMLEFT", 0, -16)
+	fntAboutHeader:SetText("About")
+
+	local fntAboutText = frmContent:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	fntAboutText:SetPoint("TOPLEFT", fntAboutHeader, "BOTTOMLEFT", 0, -10)
+	fntAboutText:SetWidth(700)
+	fntAboutText:SetJustifyH("LEFT")
+	fntAboutText:SetSpacing(4)
+
+	local strVersion = "1.0"
+	if C_AddOns and C_AddOns.GetAddOnMetadata then
+		strVersion = C_AddOns.GetAddOnMetadata("MalitorsPortraitFrame", "Version") or strVersion
+	end
+
+	fntAboutText:SetText(
+		"Developer: |cFFFFFFFFMalitor|r\n" ..
+		("Version: |cFFFFFFFF%s|r\n"):format(tostring(strVersion)) ..
+		"Addon: |cFFFFFFFFMalitor's Portrait Frame|r"
+	)
+
+	local frmCurseForgeBox = CreateReadOnlyURLBox(
+		frmContent,
+		"CurseForge",
+		"https://www.curseforge.com/wow/addons/malitors-portrait-frame",
+		fntAboutText
+	)
+
+	local frmGitHubBox = CreateReadOnlyURLBox(
+		frmContent,
+		"GitHub",
+		"https://github.com/Malitor/MalitorsPortraitFrame",
+		frmCurseForgeBox
+	)
+
+	local fntFooter = frmContent:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	fntFooter:SetPoint("TOPLEFT", frmGitHubBox, "BOTTOMLEFT", 0, -14)
+	fntFooter:SetWidth(700)
+	fntFooter:SetJustifyH("LEFT")
+	fntFooter:SetText("Tip: Click into a link field to highlight it for copying.")
 
 	local function RefreshOptionsControls()
 		chkLock:SetChecked(tblHelpers.GetDB() and tblHelpers.GetDB().locked)
@@ -656,7 +752,7 @@ function tblOptions.CreateOptionsPanel()
 
 	tblState.fnRefreshOptionsControls = tblOptions.RefreshAllOptionsControls
 
-	local frmResetButton = CreateFrame("Button", nil, frmPanel, "UIPanelButtonTemplate")
+	local frmResetButton = CreateFrame("Button", nil, frmContent, "UIPanelButtonTemplate")
 	frmResetButton:SetSize(120, 22)
 	frmResetButton:SetPoint("TOPLEFT", chkLock, "TOPRIGHT", 86, -4)
 	frmResetButton:SetText("Reset")
