@@ -2,7 +2,7 @@
 ## Title: Malitor's Portrait Frame
 ## Notes: A movable 3D portrait frame.
 ## Author: Malitor Greymaulkin
-## Version: 12.0.1
+## Version: 12.0.3
 ## SavedVariables: MalitorsPortraitFrameDB
 ## OptionalDeps: LibSharedMedia-3.0
 
