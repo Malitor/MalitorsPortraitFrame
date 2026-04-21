@@ -1,8 +1,8 @@
-## Interface: 120001
+## Interface: 120005
 ## Title: Malitor's Portrait Frame
 ## Notes: A movable 3D portrait frame.
 ## Author: Malitor Greymaulkin
-## Version: 12.0.3
+## Version: 12.0.4
 ## SavedVariables: MalitorsPortraitFrameDB
 ## OptionalDeps: LibSharedMedia-3.0
 
